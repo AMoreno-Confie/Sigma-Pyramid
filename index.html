@@ -1,25 +1,41 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Pirámide Sigma Definitiva</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pirámide Sigma Profesional</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: transparent; 
+            overflow: auto; 
+            width: 100%; 
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            background-color: transparent;
         }
+        #placeholder {
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+            justify-content: center; 
+            height: 100vh;
+            color: #6b7280; 
+            gap: 12px; 
+            text-align: center; 
+            padding: 24px;
+        }
+        #placeholder p { font-size: 14px; max-width: 340px; line-height: 1.7; }
+        
+        #chart-container { display: none; width: 100%; max-width: 600px; padding: 14px; }
+        
         .pyramid-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             width: 100%;
-            max-width: 600px;
         }
         .pyramid-level {
             display: flex;
@@ -29,7 +45,7 @@
             color: white;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             box-sizing: border-box;
             padding: 8px;
             transition: all 0.3s ease;
@@ -46,84 +62,125 @@
             opacity: 0.95;
             margin-top: 2px;
         }
-        .message {
-            color: #555;
-            font-size: 14px;
-            text-align: center;
-            padding: 20px;
-        }
     </style>
 </head>
 <body>
 
-    <div class="pyramid-container" id="pyramid">
-        <div class="message">Conectado con Sigma. Por favor asigna tus columnas en el panel izquierdo.</div>
+    <div id="placeholder">
+        <p id="placeholder-msg">
+            En el panel del editor: selecciona una <strong>Fuente de Datos (Data Source)</strong>, 
+            luego asigna la columna de texto para los niveles y la métrica numérica.
+        </p>
     </div>
 
-    <script src="./sigma-plugin.js"></script>
-    
+    <div id="chart-container">
+        <div class="pyramid-container" id="pyramid"></div>
+    </div>
+
+    <script src="https://unpkg.com/@sigmacomputing/plugin@1.2.0/dist/umd/sigmacomputing-plugin.umd.js"></script>
+
     <script>
-        // CONFIGURACIÓN DE PARÁMETROS PARA EL PANEL DE DATOS
-        sigma.plugins.config({
-            source: { type: "element" },
-            variables: [
-                { name: "NivelTexto", type: "column", allowedTypes: ["text"], label: "1. Columna de Niveles (Texto)" },
-                { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"], label: "2. Columna de Valores (Métrica)" },
-                { name: "ListaColores", type: "string", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4", label: "3. Colores HEX (separados por comas)" },
-                { name: "TamanoTextoNivel", type: "integer", defaultValue: 14, label: "4. Tamaño Texto Nivel (px)" },
-                { name: "TamanoTextoPorcentaje", type: "integer", defaultValue: 12, label: "5. Tamaño Texto Porcentaje (px)" }
-            ]
-        });
+        (function () {
+            'use strict';
 
-        // FUNCIÓN QUE PINTA LA PIRÁMIDE CON PORCENTAJES
-        sigma.plugins.getRows(function(rows) {
-            const container = document.getElementById('pyramid');
-            container.innerHTML = '';
+            let currentConfig = {};
+            let dataUnsub = null;
+            const client = SigmaPlugin.client;
 
-            if (!rows || rows.length === 0) {
-                container.innerHTML = '<div class="message">Por favor, arrastra columnas a "NivelTexto" y "ValorNumero".</div>';
-                return;
+            // CONFIGURACIÓN DEL PANEL EDITOR (Desbloquea el Data Source nativamente)
+            client.config.configureEditorPanel([
+                { name: "source", type: "element", label: "Data Source" },
+                { name: "levelCol", type: "column", source: "source", label: "1. Columna de Niveles (Texto)" },
+                { name: "valueCol", type: "column", source: "source", label: "2. Columna de Valores (Métrica)" },
+                { name: "listaColores", type: "text", label: "3. Colores HEX (separados por comas)", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4" },
+                { name: "tamanoNivel", type: "text", label: "4. Tamaño Texto Nivel (px)", defaultValue: "14" },
+                { name: "tamanoPct", type: "text", label: "5. Tamaño Texto Porcentaje (px)", defaultValue: "12" }
+            ]);
+
+            // Suscribirse a los cambios del panel y los datos de Sigma
+            client.config.subscribe((cfg) => {
+                currentConfig = cfg || {};
+                
+                if (dataUnsub) { dataUnsub(); dataUnsub = null; }
+                
+                const src = currentConfig.source;
+                if (src) {
+                    dataUnsub = client.elements.subscribeToElementData(src, (sigmaData) => {
+                        renderPyramid(sigmaData);
+                    });
+                } else {
+                    showPlaceholder();
+                }
+            });
+
+            function showPlaceholder() {
+                document.getElementById("placeholder").style.display = "flex";
+                document.getElementById("chart-container").style.display = "none";
             }
 
-            const config = sigma.plugins.getOptions() || {};
-            let colorsInput = config.ListaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
-            let colors = colorsInput.split(',').map(c => c.trim());
+            // FUNCIÓN PARA RENDERIZAR LA PIRÁMIDE
+            function renderPyramid(sigmaData) {
+                const container = document.getElementById('pyramid');
+                container.innerHTML = '';
 
-            let fontSizeTxt = (config.TamanoTextoNivel || 14) + 'px';
-            let fontSizePct = (config.TamanoTextoPorcentaje || 12) + 'px';
+                const lCol = currentConfig.levelCol;
+                const vCol = currentConfig.valueCol;
 
-            const keys = Object.keys(rows[0]);
-            const labelKey = keys[0]; 
-            const valueKey = keys[1]; 
+                // Si no se han seleccionado las columnas básicas, mantener el placeholder
+                if (!lCol || !vCol || !sigmaData[lCol] || !sigmaData[vCol]) {
+                    showPlaceholder();
+                    return;
+                }
 
-            const total = rows.reduce((sum, row) => sum + Number(row[valueKey] || 0), 0);
-            const numLevels = rows.length;
+                // Ocultar placeholder y mostrar gráfico
+                document.getElementById("placeholder").style.display = "none";
+                document.getElementById("chart-container").style.display = "block";
 
-            rows.forEach((row, index) => {
-                const label = row[labelKey] || "Sin nombre";
-                const value = Number(row[valueKey] || 0);
-                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                // Procesar variables de diseño opcionales
+                let colorsInput = currentConfig.listaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
+                let colors = colorsInput.split(',').map(c => c.trim());
 
-                const topWidth = (index / numLevels) * 45; 
-                const bottomWidth = ((index + 1) / numLevels) * 45;
+                let fontSizeTxt = (currentConfig.tamanoNivel || "14") + 'px';
+                let fontSizePct = (currentConfig.tamanoPct || "12") + 'px';
 
-                const levelDiv = document.createElement('div');
-                levelDiv.className = 'pyramid-level';
-                levelDiv.style.setProperty('--tw', `${topWidth}%`);
-                levelDiv.style.setProperty('--bw', `${bottomWidth}%`);
-                
-                levelDiv.style.backgroundColor = colors[index % colors.length] || '#A0AEC0';
-                levelDiv.style.width = '100%';
-                levelDiv.style.height = `${Math.max(50, 380 / numLevels)}px`;
+                // Extraer arreglos de datos de Sigma
+                const levelRows = sigmaData[lCol];
+                const valueRows = sigmaData[vCol];
+                const numLevels = levelRows.length;
 
-                levelDiv.innerHTML = `
-                    <div class="level-text" style="font-size: ${fontSizeTxt};">${label}</div>
-                    <div class="level-pct" style="font-size: ${fontSizePct};">${percentage}% (${value.toLocaleString()})</div>
-                `;
-                
-                container.appendChild(levelDiv);
-            });
-        });
+                // Calcular total general para los porcentajes
+                let total = 0;
+                for (let i = 0; i < numLevels; i++) {
+                    total += Number(valueRows[i] || 0);
+                }
+
+                // Dibujar trapecios
+                for (let i = 0; i < numLevels; i++) {
+                    const label = levelRows[i] || "Sin nombre";
+                    const value = Number(valueRows[i] || 0);
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+
+                    const topWidth = (i / numLevels) * 45; 
+                    const bottomWidth = ((i + 1) / numLevels) * 45;
+
+                    const levelDiv = document.createElement('div');
+                    levelDiv.className = 'pyramid-level';
+                    levelDiv.style.setProperty('--tw', `${topWidth}%`);
+                    levelDiv.style.setProperty('--bw', `${bottomWidth}%`);
+                    
+                    levelDiv.style.backgroundColor = colors[i % colors.length] || '#A0AEC0';
+                    levelDiv.style.width = '100%';
+                    levelDiv.style.height = `${Math.max(50, 380 / numLevels)}px`;
+
+                    levelDiv.innerHTML = `
+                        <div class="level-text" style="font-size: ${fontSizeTxt};">${label}</div>
+                        <div class="level-pct" style="font-size: ${fontSizePct};">${percentage}% (${value.toLocaleString()})</div>
+                    `;
+                    container.appendChild(levelDiv);
+                }
+            }
+
+        })();
     </script>
 </body>
 </html>
