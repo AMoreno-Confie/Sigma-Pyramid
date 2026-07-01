@@ -57,13 +57,44 @@
 <body>
 
     <div class="pyramid-container" id="pyramid">
-        <div class="message" id="status-msg">Cargando interfaz de Sigma... Arrastra tus datos en el panel izquierdo.</div>
+        <div class="message">Conectado con Sigma. Arrastra tus columnas en el panel de datos izquierdo.</div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@sigmacomputing/plugin"></script>
+    <script>
+        (function() {
+            var pluginOptions = {};
+            var configCallback = null;
+            var rowsCallback = null;
+
+            window.sigma = {
+                plugins: {
+                    config: function(config) {
+                        window.parent.postMessage({ type: 'config', config: config }, '*');
+                    },
+                    getOptions: function() {
+                        return pluginOptions;
+                    },
+                    getRows: function(callback) {
+                        rowsCallback = callback;
+                        window.parent.postMessage({ type: 'getRows' }, '*');
+                    }
+                }
+            };
+
+            window.addEventListener('message', function(event) {
+                if (!event.data) return;
+                if (event.data.type === 'options') {
+                    pluginOptions = event.data.options || {};
+                }
+                if (event.data.type === 'rows' && rowsCallback) {
+                    rowsCallback(event.data.rows);
+                }
+            });
+        })();
+    </script>
     
     <script>
-        // Función principal que dibuja la pirámide cuando llegan los datos
+        // FUNCIÓN QUE DIBUJA LA PIRÁMIDE
         function renderPyramid(rows) {
             const container = document.getElementById('pyramid');
             container.innerHTML = '';
@@ -73,7 +104,6 @@
                 return;
             }
 
-            // Obtener las opciones de personalización (colores y tamaños)
             const config = sigma.plugins.getOptions() || {};
             
             let colorsInput = config.ListaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
@@ -110,34 +140,23 @@
                     <div class="level-text" style="font-size: ${fontSizeTxt};">${label}</div>
                     <div class="level-pct" style="font-size: ${fontSizePct};">${percentage}% (${value.toLocaleString()})</div>
                 `;
-                
                 container.appendChild(levelDiv);
             });
         }
 
-        // INICIALIZACIÓN COMPATIBLE CON NETLIFY Y SIGMA
-        document.addEventListener("DOMContentLoaded", function() {
-            if (typeof sigma !== 'undefined' && sigma.plugins) {
-                
-                // Definir los campos que aparecerán en el panel izquierdo
-                sigma.plugins.config({
-                    source: { type: "element" },
-                    variables: [
-                        { name: "NivelTexto", type: "column", allowedTypes: ["text"], label: "1. Columna de Niveles (Texto)" },
-                        { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"], label: "2. Columna de Valores (Métrica)" },
-                        { name: "ListaColores", type: "string", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4", label: "3. Colores HEX (separados por comas)" },
-                        { name: "TamanoTextoNivel", type: "integer", defaultValue: 14, label: "4. Tamaño Texto Nivel (px)" },
-                        { name: "TamanoTextoPorcentaje", type: "integer", defaultValue: 12, label: "5. Tamaño Texto Porcentaje (px)" }
-                    ]
-                });
-
-                // Escuchar los datos reales de Sigma
-                sigma.plugins.getRows(renderPyramid);
-                
-            } else {
-                document.getElementById('status-msg').innerText = "Error crítico: No se pudo conectar con la API de Sigma.";
-            }
+        // INICIALIZACIÓN DE VARIABLES
+        sigma.plugins.config({
+            source: { type: "element" },
+            variables: [
+                { name: "NivelTexto", type: "column", allowedTypes: ["text"], label: "1. Columna de Niveles (Texto)" },
+                { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"], label: "2. Columna de Valores (Métrica)" },
+                { name: "ListaColores", type: "string", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4", label: "3. Colores HEX (separados por comas)" },
+                { name: "TamanoTextoNivel", type: "integer", defaultValue: 14, label: "4. Tamaño Texto Nivel (px)" },
+                { name: "TamanoTextoPorcentaje", type: "integer", defaultValue: 12, label: "5. Tamaño Texto Porcentaje (px)" }
+            ]
         });
+
+        sigma.plugins.getRows(renderPyramid);
     </script>
 </body>
 </html>
