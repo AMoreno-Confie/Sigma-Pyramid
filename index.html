@@ -30,20 +30,12 @@
             font-weight: bold;
             text-align: center;
             margin-bottom: 4px;
-            transition: all 0.3s ease;
             box-sizing: border-box;
             padding: 5px;
-            /* Esto recorta el rectángulo para darle forma de trapecio/pirámide */
             clip-path: polygon(var(--tw) 0%, var(--bw) 100%, calc(100% - var(--bw)) 100%, calc(100% - var(--tw)) 0%);
         }
-        .level-text {
-            font-size: 14px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-        }
-        .level-pct {
-            font-size: 12px;
-            opacity: 0.9;
-        }
+        .level-text { font-size: 14px; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); }
+        .level-pct { font-size: 12px; opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -52,54 +44,58 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@sigmacomputing/plugin"></script>
     <script>
-        // Colores para los niveles (puedes cambiarlos por códigos HEX que te gusten)
+        // CONFIGURACIÓN DE CAMPOS PARA SIGMA
+        // Esto obliga a Sigma a mostrarte las cajas para arrastrar columnas en el panel de Data
+        sigma.plugins.config({
+            source: {
+                type: "element"
+            },
+            variables: [
+                { name: "NivelTexto", type: "column", allowedTypes: ["text"] },
+                { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"] }
+            ]
+        });
+
         const colors = ['#1A365D', '#2B6CB0', '#4299E1', '#63B3ED', '#90CDF4'];
 
-        // Escuchar los datos que vienen desde Sigma
+        // Escuchar los datos vinculados
         sigma.plugins.getRows(function(rows) {
             const container = document.getElementById('pyramid');
-            container.innerHTML = ''; // Limpiar el contenido viejo
+            container.innerHTML = '';
 
             if (!rows || rows.length === 0) {
-                container.innerHTML = '<div>Esperando datos de Sigma...</div>';
+                container.innerHTML = '<div>Arrastra tus columnas en el panel de datos izquierdo</div>';
                 return;
             }
 
-            // Identificar automáticamente las columnas que arrastraste en Sigma
+            // Mapear las columnas según las variables que definimos arriba
             const keys = Object.keys(rows[0]);
-            const labelKey = keys[0];  // Primera columna (Texto)
-            const valueKey = keys[1];  // Segunda columna (Número)
+            const labelKey = keys[0]; 
+            const valueKey = keys[1]; 
 
-            // Calcular la suma total para poder sacar los porcentajes
             const total = rows.reduce((sum, row) => sum + Number(row[valueKey] || 0), 0);
             const numLevels = rows.length;
 
-            // Dibujar cada nivel de la pirámide
             rows.forEach((row, index) => {
                 const label = row[labelKey];
                 const value = Number(row[valueKey] || 0);
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
 
-                // Geometría matemática para el efecto pirámide
                 const topWidth = (index / numLevels) * 45; 
                 const bottomWidth = ((index + 1) / numLevels) * 45;
 
                 const levelDiv = document.createElement('div');
                 levelDiv.className = 'pyramid-level';
-                
-                // Aplicar estilos dinámicos
                 levelDiv.style.setProperty('--tw', `${topWidth}%`);
                 levelDiv.style.setProperty('--bw', `${bottomWidth}%`);
                 levelDiv.style.backgroundColor = colors[index % colors.length];
                 levelDiv.style.width = '100%';
                 levelDiv.style.height = `${Math.max(45, 350 / numLevels)}px`;
 
-                // Insertar el texto y el porcentaje
                 levelDiv.innerHTML = `
                     <div class="level-text">${label}</div>
                     <div class="level-pct">${percentage}% (${value.toLocaleString()})</div>
                 `;
-
                 container.appendChild(levelDiv);
             });
         });
