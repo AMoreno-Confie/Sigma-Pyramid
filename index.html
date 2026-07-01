@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Pirámide Sigma Avanzada</title>
+    <title>Pirámide Sigma Definitiva</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -57,55 +57,35 @@
 <body>
 
     <div class="pyramid-container" id="pyramid">
-        <div class="message">Conectado con Sigma. Arrastra tus columnas en el panel de datos izquierdo.</div>
+        <div class="message">Conectado con Sigma. Por favor asigna tus columnas en el panel izquierdo.</div>
     </div>
 
-    <script>
-        (function() {
-            var pluginOptions = {};
-            var configCallback = null;
-            var rowsCallback = null;
-
-            window.sigma = {
-                plugins: {
-                    config: function(config) {
-                        window.parent.postMessage({ type: 'config', config: config }, '*');
-                    },
-                    getOptions: function() {
-                        return pluginOptions;
-                    },
-                    getRows: function(callback) {
-                        rowsCallback = callback;
-                        window.parent.postMessage({ type: 'getRows' }, '*');
-                    }
-                }
-            };
-
-            window.addEventListener('message', function(event) {
-                if (!event.data) return;
-                if (event.data.type === 'options') {
-                    pluginOptions = event.data.options || {};
-                }
-                if (event.data.type === 'rows' && rowsCallback) {
-                    rowsCallback(event.data.rows);
-                }
-            });
-        })();
-    </script>
+    <script src="./sigma-plugin.js"></script>
     
     <script>
-        // FUNCIÓN QUE DIBUJA LA PIRÁMIDE
-        function renderPyramid(rows) {
+        // CONFIGURACIÓN DE PARÁMETROS PARA EL PANEL DE DATOS
+        sigma.plugins.config({
+            source: { type: "element" },
+            variables: [
+                { name: "NivelTexto", type: "column", allowedTypes: ["text"], label: "1. Columna de Niveles (Texto)" },
+                { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"], label: "2. Columna de Valores (Métrica)" },
+                { name: "ListaColores", type: "string", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4", label: "3. Colores HEX (separados por comas)" },
+                { name: "TamanoTextoNivel", type: "integer", defaultValue: 14, label: "4. Tamaño Texto Nivel (px)" },
+                { name: "TamanoTextoPorcentaje", type: "integer", defaultValue: 12, label: "5. Tamaño Texto Porcentaje (px)" }
+            ]
+        });
+
+        // FUNCIÓN QUE PINTA LA PIRÁMIDE CON PORCENTAJES
+        sigma.plugins.getRows(function(rows) {
             const container = document.getElementById('pyramid');
             container.innerHTML = '';
 
             if (!rows || rows.length === 0) {
-                container.innerHTML = '<div class="message">Por favor, asigna columnas a "NivelTexto" y "ValorNumero" en el panel de datos.</div>';
+                container.innerHTML = '<div class="message">Por favor, arrastra columnas a "NivelTexto" y "ValorNumero".</div>';
                 return;
             }
 
             const config = sigma.plugins.getOptions() || {};
-            
             let colorsInput = config.ListaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
             let colors = colorsInput.split(',').map(c => c.trim());
 
@@ -140,23 +120,10 @@
                     <div class="level-text" style="font-size: ${fontSizeTxt};">${label}</div>
                     <div class="level-pct" style="font-size: ${fontSizePct};">${percentage}% (${value.toLocaleString()})</div>
                 `;
+                
                 container.appendChild(levelDiv);
             });
-        }
-
-        // INICIALIZACIÓN DE VARIABLES
-        sigma.plugins.config({
-            source: { type: "element" },
-            variables: [
-                { name: "NivelTexto", type: "column", allowedTypes: ["text"], label: "1. Columna de Niveles (Texto)" },
-                { name: "ValorNumero", type: "column", allowedTypes: ["integer", "number"], label: "2. Columna de Valores (Métrica)" },
-                { name: "ListaColores", type: "string", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4", label: "3. Colores HEX (separados por comas)" },
-                { name: "TamanoTextoNivel", type: "integer", defaultValue: 14, label: "4. Tamaño Texto Nivel (px)" },
-                { name: "TamanoTextoPorcentaje", type: "integer", defaultValue: 12, label: "5. Tamaño Texto Porcentaje (px)" }
-            ]
         });
-
-        sigma.plugins.getRows(renderPyramid);
     </script>
 </body>
 </html>
