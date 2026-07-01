@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pirámide Sigma Profesional</title>
+    <title>Pirámide Sigma Premium</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #fff; 
+            background: transparent; 
             overflow: auto; 
             width: 100%; 
             min-height: 100vh;
@@ -29,7 +29,7 @@
         }
         #placeholder p { font-size: 14px; max-width: 340px; line-height: 1.7; }
         
-        #chart-container { display: none; width: 100%; max-width: 600px; padding: 14px; }
+        #chart-container { display: none; width: 100%; max-width: 650px; padding: 20px; }
         
         .pyramid-container {
             display: flex;
@@ -45,22 +45,22 @@
             color: white;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             box-sizing: border-box;
-            padding: 8px;
+            padding: 10px;
             transition: all 0.3s ease;
-            clip-path: polygon(var(--tw) 0%, var(--bw) 100%, calc(100% - var(--bw)) 100%, calc(100% - var(--tw)) 0%);
+            /* El diseño del trapecio se aplicará de manera dinámica e inmune a bloqueos */
         }
         .level-text {
             font-weight: bold;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-            line-height: 1.2;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+            line-height: 1.3;
         }
         .level-pct {
             font-weight: normal;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
             opacity: 0.95;
-            margin-top: 2px;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -69,7 +69,7 @@
     <div id="placeholder">
         <p id="placeholder-msg">
             En el panel del editor: selecciona una <strong>Fuente de Datos (Data Source)</strong>, 
-            luego asigna la columna de texto para los niveles y la métrica numérica.
+            luego asigna las columnas y personaliza el diseño de tu pirámide.
         </p>
     </div>
 
@@ -84,22 +84,55 @@
         (function () {
             'use strict';
 
+            if (typeof SigmaPlugin === 'undefined') return;
+
             let currentConfig = {};
             let currentData = {};
             let dataUnsub = null;
             const client = SigmaPlugin.client;
 
-            // CONFIGURACIÓN IDÉNTICA AL FORMATO VÁLIDO DE SIGMA
+            // PANEL CONFIGURADO CON DROPDOWNS INTERACTIVOS EXIGIDOS
             client.config.configureEditorPanel([
                 { name: "source", type: "element", label: "Data Source" },
                 { name: "levelCol", type: "column", source: "source", label: "1. Columna de Niveles (Texto)" },
-                { name: "valueCol", type: "column", source: "source", label: "2. Columna de Valores (Métrica)" },
-                { name: "listaColores", type: "text", label: "3. Colores HEX (separados por comas)" },
-                { name: "tamanoNivel", type: "text", label: "4. Tamaño Texto Nivel (px)" },
-                { name: "tamanoPct", type: "text", label: "5. Tamaño Texto Porcentaje (px)" }
+                { name: "valueCol", type: "column", source: "source", label: "2. Métrica / Valores (Número)" },
+                { 
+                    name: "listaColores", 
+                    type: "dropdown", 
+                    label: "3. Paleta de Colores",
+                    options: [
+                        { value: "azul", label: "Azul Corporativo (Oscuro a Claro)" },
+                        { value: "vibrante", label: "Arcoíris Vibrante" },
+                        { value: "esmeralda", label: "Escala Esmeralda / Verde" },
+                        { value: "gris", label: "Monocromático Profesional" }
+                    ],
+                    defaultValue: "azul"
+                },
+                { 
+                    name: "tamanoNivel", 
+                    type: "dropdown", 
+                    label: "4. Tamaño Texto Nivel",
+                    options: [
+                        { value: "11", label: "Pequeño (11px)" },
+                        { value: "14", label: "Medio (14px)" },
+                        { value: "16", label: "Grande (16px)" },
+                        { value: "18", label: "Titular (18px)" }
+                    ],
+                    defaultValue: "14"
+                },
+                { 
+                    name: "tamanoPct", 
+                    type: "dropdown", 
+                    label: "5. Tamaño Texto Porcentaje",
+                    options: [
+                        { value: "10", label: "Pequeño (10px)" },
+                        { value: "12", label: "Medio (12px)" },
+                        { value: "14", label: "Grande (14px)" }
+                    ],
+                    defaultValue: "12"
+                }
             ]);
 
-            // Suscriptor idéntico al de tu compañera para refrescar los datos limpios
             client.config.subscribe((cfg) => {
                 currentConfig = cfg || {};
                 if (dataUnsub) { dataUnsub(); dataUnsub = null; }
@@ -116,11 +149,18 @@
                 }
             });
 
+            // Mapas de colores según la selección del Dropdown
+            const paletas = {
+                azul: ["#0A2540", "#1A365D", "#2B6CB0", "#4299E1", "#63B3ED", "#90CDF4"],
+                vibrante: ["#E53E3E", "#DD6B20", "#319795", "#3182CE", "#805AD5", "#D53F8C"],
+                esmeralda: ["#064E3B", "#047857", "#059669", "#10B981", "#34D399", "#6EE7B7"],
+                gris: ["#1A202C", "#2D3748", "#4A5568", "#718096", "#A0AEC0", "#CBD5E0"]
+            };
+
             function rebuildAndDraw() {
                 const lCol = currentConfig.levelCol;
                 const vCol = currentConfig.valueCol;
 
-                // Si no hay datos asignados o no existen las columnas en la tabla elegida, mostramos instrucciones
                 if (!lCol || !vCol || !currentData[lCol] || currentData[lCol].length === 0) {
                     document.getElementById("placeholder").style.display = "flex";
                     document.getElementById("chart-container").style.display = "none";
@@ -133,9 +173,9 @@
                 const container = document.getElementById('pyramid');
                 container.innerHTML = '';
 
-                // Valores por defecto si el usuario no escribe nada en los inputs de texto
-                let colorsInput = currentConfig.listaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
-                let colors = colorsInput.split(',').map(c => c.trim());
+                // Obtener configuraciones de los dropdowns
+                let seleccionPaleta = currentConfig.listaColores || "azul";
+                let colors = paletas[seleccionPaleta] || paletas.azul;
 
                 let fontSizeTxt = (currentConfig.tamanoNivel || "14") + 'px';
                 let fontSizePct = (currentConfig.tamanoPct || "12") + 'px';
@@ -144,27 +184,33 @@
                 const valueRows = currentData[vCol];
                 const numLevels = levelRows.length;
 
+                // CORRECCIÓN DE CÁLCULO: Sumar correctamente el gran total numérico
                 let total = 0;
                 for (let i = 0; i < numLevels; i++) {
-                    total += Number(valueRows[i] || 0);
+                    let valNum = parseFloat(valueRows[i]);
+                    total += isNaN(valNum) ? 0 : valNum;
                 }
 
                 for (let i = 0; i < numLevels; i++) {
                     const label = levelRows[i] || "Sin nombre";
-                    const value = Number(valueRows[i] || 0);
-                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                    const value = parseFloat(valueRows[i]) || 0;
+                    
+                    // Cálculo preciso del porcentaje individual sobre el total de la pirámide
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
 
-                    const topWidth = (i / numLevels) * 45; 
-                    const bottomWidth = ((i + 1) / numLevels) * 45;
+                    // ALGORITMO DE PIRÁMIDE (Trapecios progresivos: punta estrecha, base ancha)
+                    const factorCorteTop = (i / numLevels) * 38; 
+                    const factorCorteBottom = ((i + 1) / numLevels) * 38;
 
                     const levelDiv = document.createElement('div');
                     levelDiv.className = 'pyramid-level';
-                    levelDiv.style.setProperty('--tw', `${topWidth}%`);
-                    levelDiv.style.setProperty('--bw', `${bottomWidth}%`);
                     
-                    levelDiv.style.backgroundColor = colors[i % colors.length] || '#A0AEC0';
+                    // Renderizado directo de clip-path para evitar bloqueos del navegador
+                    levelDiv.style.clipPath = `polygon(${factorCorteTop}% 0%, ${100 - factorCorteTop}% 0%, ${100 - factorCorteBottom}% 100%, ${factorCorteBottom}% 100%)`;
+                    
+                    levelDiv.style.backgroundColor = colors[i % colors.length];
                     levelDiv.style.width = '100%';
-                    levelDiv.style.height = `${Math.max(50, 380 / numLevels)}px`;
+                    levelDiv.style.height = `${Math.max(55, 360 / numLevels)}px`;
 
                     levelDiv.innerHTML = `
                         <div class="level-text" style="font-size: ${fontSizeTxt};">${label}</div>
