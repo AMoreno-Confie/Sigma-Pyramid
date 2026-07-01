@@ -8,7 +8,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: transparent; 
+            background: #fff; 
             overflow: auto; 
             width: 100%; 
             min-height: 100vh;
@@ -77,73 +77,71 @@
         <div class="pyramid-container" id="pyramid"></div>
     </div>
 
-    <script src="https://unpkg.com/@sigmacomputing/plugin@1.2.0/dist/umd/sigmacomputing-plugin.umd.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@sigmacomputing/plugin@1.2.0/dist/umd/sigmacomputing-plugin.umd.js" crossorigin></script>
 
     <script>
         (function () {
             'use strict';
 
-            // Nos aseguramos de que la librería exista antes de avanzar
-            if (typeof SigmaPlugin === 'undefined') return;
-
             let currentConfig = {};
+            let currentData = {};
             let dataUnsub = null;
             const client = SigmaPlugin.client;
 
-            // CORRECCIÓN DE TIPOS: Cambiados "text" por "string" requeridos por Sigma
+            // CONFIGURACIÓN IDÉNTICA AL FORMATO VÁLIDO DE SIGMA
             client.config.configureEditorPanel([
                 { name: "source", type: "element", label: "Data Source" },
                 { name: "levelCol", type: "column", source: "source", label: "1. Columna de Niveles (Texto)" },
                 { name: "valueCol", type: "column", source: "source", label: "2. Columna de Valores (Métrica)" },
-                { name: "listaColores", type: "string", label: "3. Colores HEX (separados por comas)", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4" },
-                { name: "tamanoNivel", type: "string", label: "4. Tamaño Texto Nivel (px)", defaultValue: "14" },
-                { name: "tamanoPct", type: "string", label: "5. Tamaño Texto Porcentaje (px)", defaultValue: "12" }
+                { name: "listaColores", type: "text", label: "3. Colores HEX (separados por comas)" },
+                { name: "tamanoNivel", type: "text", label: "4. Tamaño Texto Nivel (px)" },
+                { name: "tamanoPct", type: "text", label: "5. Tamaño Texto Porcentaje (px)" }
             ]);
 
-            // Suscribirse a los cambios de Sigma
+            // Suscriptor idéntico al de tu compañera para refrescar los datos limpios
             client.config.subscribe((cfg) => {
                 currentConfig = cfg || {};
-                
                 if (dataUnsub) { dataUnsub(); dataUnsub = null; }
                 
                 const src = currentConfig.source;
                 if (src) {
-                    dataUnsub = client.elements.subscribeToElementData(src, (sigmaData) => {
-                        renderPyramid(sigmaData);
+                    dataUnsub = client.elements.subscribeToElementData(src, (data) => {
+                        currentData = data || {};
+                        rebuildAndDraw();
                     });
                 } else {
-                    showPlaceholder();
+                    currentData = {};
+                    rebuildAndDraw();
                 }
             });
 
-            function showPlaceholder() {
-                document.getElementById("placeholder").style.display = "flex";
-                document.getElementById("chart-container").style.display = "none";
-            }
-
-            function renderPyramid(sigmaData) {
-                const container = document.getElementById('pyramid');
-                container.innerHTML = '';
-
+            function rebuildAndDraw() {
                 const lCol = currentConfig.levelCol;
                 const vCol = currentConfig.valueCol;
 
-                if (!lCol || !vCol || !sigmaData[lCol] || !sigmaData[vCol]) {
-                    showPlaceholder();
+                // Si no hay datos asignados o no existen las columnas en la tabla elegida, mostramos instrucciones
+                if (!lCol || !vCol || !currentData[lCol] || currentData[lCol].length === 0) {
+                    document.getElementById("placeholder").style.display = "flex";
+                    document.getElementById("chart-container").style.display = "none";
                     return;
                 }
 
                 document.getElementById("placeholder").style.display = "none";
                 document.getElementById("chart-container").style.display = "block";
 
+                const container = document.getElementById('pyramid');
+                container.innerHTML = '';
+
+                // Valores por defecto si el usuario no escribe nada en los inputs de texto
                 let colorsInput = currentConfig.listaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
                 let colors = colorsInput.split(',').map(c => c.trim());
 
                 let fontSizeTxt = (currentConfig.tamanoNivel || "14") + 'px';
                 let fontSizePct = (currentConfig.tamanoPct || "12") + 'px';
 
-                const levelRows = sigmaData[lCol];
-                const valueRows = sigmaData[vCol];
+                const levelRows = currentData[lCol];
+                const valueRows = currentData[vCol];
                 const numLevels = levelRows.length;
 
                 let total = 0;
