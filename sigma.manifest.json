@@ -1,0 +1,21 @@
+{
+  "name": "Pyramid",
+  "description": "Plugin para crear una pirámide con porcentajes por niveles",
+  "productionUrl": "https://amoreno-confie.github.io/Sigma-Pyramid/index.html",
+  "developmentUrl": "http://localhost:5173",
+  "icon": "chart-bar",
+  "inputs": {
+    "rows": {
+      "NivelTexto": {
+        "type": "column",
+        "allowedTypes": ["text"],
+        "label": "Columna de Texto (Niveles)"
+      },
+      "ValorNumero": {
+        "type": "column",
+        "allowedTypes": ["integer", "number"],
+        "label": "Columna Numérica (Valores)"
+      }
+    }
+  }
+}
