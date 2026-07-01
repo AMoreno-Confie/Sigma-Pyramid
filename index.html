@@ -80,14 +80,20 @@
     <script src="https://unpkg.com/@sigmacomputing/plugin@1.2.0/dist/umd/sigmacomputing-plugin.umd.js"></script>
 
     <script>
-        (function () {
+        // Función contenedora que se ejecuta ÚNICAMENTE cuando la librería externa de Sigma está lista
+        function iniciarPluginSigma() {
             'use strict';
+
+            if (typeof SigmaPlugin === 'undefined') {
+                document.getElementById("placeholder-msg").innerText = "Error: No se pudo cargar la librería de Sigma de forma externa.";
+                return;
+            }
 
             let currentConfig = {};
             let dataUnsub = null;
             const client = SigmaPlugin.client;
 
-            // CONFIGURACIÓN DEL PANEL EDITOR (Desbloquea el Data Source nativamente)
+            // CONFIGURACIÓN INTERACTIVA DEL PANEL
             client.config.configureEditorPanel([
                 { name: "source", type: "element", label: "Data Source" },
                 { name: "levelCol", type: "column", source: "source", label: "1. Columna de Niveles (Texto)" },
@@ -97,7 +103,7 @@
                 { name: "tamanoPct", type: "text", label: "5. Tamaño Texto Porcentaje (px)", defaultValue: "12" }
             ]);
 
-            // Suscribirse a los cambios del panel y los datos de Sigma
+            // Suscribirse al estado de Sigma
             client.config.subscribe((cfg) => {
                 currentConfig = cfg || {};
                 
@@ -118,7 +124,6 @@
                 document.getElementById("chart-container").style.display = "none";
             }
 
-            // FUNCIÓN PARA RENDERIZAR LA PIRÁMIDE
             function renderPyramid(sigmaData) {
                 const container = document.getElementById('pyramid');
                 container.innerHTML = '';
@@ -126,35 +131,29 @@
                 const lCol = currentConfig.levelCol;
                 const vCol = currentConfig.valueCol;
 
-                // Si no se han seleccionado las columnas básicas, mantener el placeholder
                 if (!lCol || !vCol || !sigmaData[lCol] || !sigmaData[vCol]) {
                     showPlaceholder();
                     return;
                 }
 
-                // Ocultar placeholder y mostrar gráfico
                 document.getElementById("placeholder").style.display = "none";
                 document.getElementById("chart-container").style.display = "block";
 
-                // Procesar variables de diseño opcionales
                 let colorsInput = currentConfig.listaColores || "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4";
                 let colors = colorsInput.split(',').map(c => c.trim());
 
                 let fontSizeTxt = (currentConfig.tamanoNivel || "14") + 'px';
                 let fontSizePct = (currentConfig.tamanoPct || "12") + 'px';
 
-                // Extraer arreglos de datos de Sigma
                 const levelRows = sigmaData[lCol];
                 const valueRows = sigmaData[vCol];
                 const numLevels = levelRows.length;
 
-                // Calcular total general para los porcentajes
                 let total = 0;
                 for (let i = 0; i < numLevels; i++) {
                     total += Number(valueRows[i] || 0);
                 }
 
-                // Dibujar trapecios
                 for (let i = 0; i < numLevels; i++) {
                     const label = levelRows[i] || "Sin nombre";
                     const value = Number(valueRows[i] || 0);
@@ -179,8 +178,10 @@
                     container.appendChild(levelDiv);
                 }
             }
+        }
 
-        })();
+        // CONTROL DE TIEMPO: Ejecutar únicamente cuando la ventana del navegador finalice todas las cargas externas
+        window.addEventListener('load', iniciarPluginSigma);
     </script>
 </body>
 </html>
