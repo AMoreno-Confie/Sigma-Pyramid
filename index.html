@@ -80,30 +80,27 @@
     <script src="https://unpkg.com/@sigmacomputing/plugin@1.2.0/dist/umd/sigmacomputing-plugin.umd.js"></script>
 
     <script>
-        // Función contenedora que se ejecuta ÚNICAMENTE cuando la librería externa de Sigma está lista
-        function iniciarPluginSigma() {
+        (function () {
             'use strict';
 
-            if (typeof SigmaPlugin === 'undefined') {
-                document.getElementById("placeholder-msg").innerText = "Error: No se pudo cargar la librería de Sigma de forma externa.";
-                return;
-            }
+            // Nos aseguramos de que la librería exista antes de avanzar
+            if (typeof SigmaPlugin === 'undefined') return;
 
             let currentConfig = {};
             let dataUnsub = null;
             const client = SigmaPlugin.client;
 
-            // CONFIGURACIÓN INTERACTIVA DEL PANEL
+            // CORRECCIÓN DE TIPOS: Cambiados "text" por "string" requeridos por Sigma
             client.config.configureEditorPanel([
                 { name: "source", type: "element", label: "Data Source" },
                 { name: "levelCol", type: "column", source: "source", label: "1. Columna de Niveles (Texto)" },
                 { name: "valueCol", type: "column", source: "source", label: "2. Columna de Valores (Métrica)" },
-                { name: "listaColores", type: "text", label: "3. Colores HEX (separados por comas)", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4" },
-                { name: "tamanoNivel", type: "text", label: "4. Tamaño Texto Nivel (px)", defaultValue: "14" },
-                { name: "tamanoPct", type: "text", label: "5. Tamaño Texto Porcentaje (px)", defaultValue: "12" }
+                { name: "listaColores", type: "string", label: "3. Colores HEX (separados por comas)", defaultValue: "#1A365D, #2B6CB0, #4299E1, #63B3ED, #90CDF4" },
+                { name: "tamanoNivel", type: "string", label: "4. Tamaño Texto Nivel (px)", defaultValue: "14" },
+                { name: "tamanoPct", type: "string", label: "5. Tamaño Texto Porcentaje (px)", defaultValue: "12" }
             ]);
 
-            // Suscribirse al estado de Sigma
+            // Suscribirse a los cambios de Sigma
             client.config.subscribe((cfg) => {
                 currentConfig = cfg || {};
                 
@@ -178,10 +175,7 @@
                     container.appendChild(levelDiv);
                 }
             }
-        }
-
-        // CONTROL DE TIEMPO: Ejecutar únicamente cuando la ventana del navegador finalice todas las cargas externas
-        window.addEventListener('load', iniciarPluginSigma);
+        })();
     </script>
 </body>
 </html>
